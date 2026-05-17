@@ -1,4 +1,4 @@
-using BlazorApp1.Components;
+using class_schedule.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
