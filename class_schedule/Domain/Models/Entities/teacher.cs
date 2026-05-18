@@ -1,4 +1,4 @@
-namespace class_schedule.Models.Entities;
+namespace class_schedule.Domain.Models.Entities;
 
 public class Teacher
 {
@@ -9,5 +9,5 @@ public class Teacher
 
   public string FullName => $"{FirstName} {LastName}";
 
-  public ICollection<Schedule> Schedule { get; set; } = [];
+  public ICollection<Schedule> Schedules { get; set; } = [];
 }

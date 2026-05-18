@@ -1,6 +1,6 @@
-using class_schedule.Models.Enums;
+using class_schedule.Domain.Models.Enums;
 
-namespace class_schedule.Models.Entities;
+namespace class_schedule.Domain.Models.Entities;
 
 public class Room
 {
@@ -9,5 +9,5 @@ public class Room
   public int Capacity { get; set; }
   public RoomType Type { get; set; }
 
-  public ICollection<Schedule> Schedule { get; set; } = [];
+  public ICollection<Schedule> Schedules { get; set; } = [];
 }

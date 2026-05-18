@@ -1,4 +1,4 @@
-namespace class_schedule.Models.Entities;
+namespace class_schedule.Domain.Models.Entities;
 
 public class Subject
 {
@@ -7,5 +7,5 @@ public class Subject
   public string Code { get; set; } = string.Empty;
   public int WeeklyHours { get; set; }
 
-  public ICollection<Schedule> Schedule { get; set; } = [];
+  public ICollection<Schedule> Schedules { get; set; } = [];
 }

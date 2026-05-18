@@ -1,6 +1,6 @@
-using class_schedule.Models.Enums;
+using class_schedule.Domain.Models.Enums;
 
-namespace class_schedule.Models.Entities;
+namespace class_schedule.Domain.Models.Entities;
 
 public class Schedule
 {

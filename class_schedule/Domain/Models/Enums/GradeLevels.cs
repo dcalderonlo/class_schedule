@@ -1,4 +1,4 @@
-namespace class_schedule.Models.Enums;
+namespace class_schedule.Domain.Models.Enums;
 
 public enum GradeLevel
 {
