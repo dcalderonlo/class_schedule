@@ -43,21 +43,21 @@ public class ScheduleConfiguration : IEntityTypeConfiguration<Schedule>
     // Un Schedule tiene un Subject.
     // Restrict: no se puede eliminar un Subject si tiene clases asignadas.
     builder.HasOne(s => s.Subject)
-          .WithMany(sub => sub.Schedule)
+          .WithMany(sub => sub.Schedules)
           .HasForeignKey(s => s.SubjectId)
           .OnDelete(DeleteBehavior.Restrict);
 
     // Un Schedule tiene un Teacher.
     // Restrict: no se puede eliminar un Teacher con clases asignadas.
     builder.HasOne(s => s.Teacher)
-          .WithMany(t => t.Schedule)
+          .WithMany(t => t.Schedules)
           .HasForeignKey(s => s.TeacherId)
           .OnDelete(DeleteBehavior.Restrict);
 
     // Un Schedule tiene un Room.
     // Restrict: no se puede eliminar un Room con clases asignadas.
     builder.HasOne(s => s.Room)
-          .WithMany(r => r.Schedule)
+          .WithMany(r => r.Schedules)
           .HasForeignKey(s => s.RoomId)
           .OnDelete(DeleteBehavior.Restrict);
 
