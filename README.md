@@ -9,10 +9,12 @@ Requires the .NET 10 SDK and ASP.NET Core runtime. Do not retarget the applicati
 ```sh
 dotnet restore ClassSchedule.sln
 dotnet build ClassSchedule.sln --no-restore
-dotnet test ClassSchedule.sln --no-build
+env -u CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED -u CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION dotnet test ClassSchedule.sln --no-build
 ```
 
 If a project-local SDK is installed under `.tools/dotnet`, replace `dotnet` with `.tools/dotnet/dotnet`. Generated build output and local tools are ignored, not deleted.
+
+SQL Server provider verification is explicitly opt-in and remains unrun; see [its safety and authorization requirements](docs/sqlserver-verification.md). For a default suite that cannot inherit an opt-in, unset both `CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED` and `CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION` as shown there.
 
 ## Implementation boundaries
 
