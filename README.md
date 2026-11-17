@@ -23,4 +23,4 @@ If a project-local SDK is installed under `.tools/dotnet`, replace `dotnet` with
 - No overnight meetings. Room capacity and subject weekly-hour limits must be enforced.
 - Database configuration and migrations are not applied automatically; never migrate an existing database without a backup and explicit approval.
 
-Authentication, academic management and enrollment endpoints are not available until their respective implementation units are completed. No secrets or default administrator credentials belong in source control.
+See [authentication setup and API usage](docs/authentication.md). Academic management and enrollment endpoints remain future work. No secrets or default administrator credentials belong in source control.

@@ -1,10 +1,13 @@
 using class_schedule.Application.DTOs;
 using class_schedule.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using class_schedule.Application.Security;
 
 namespace class_schedule.Web.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class ScheduleController(IScheduleService scheduleService) : ControllerBase
 {
@@ -30,6 +33,7 @@ public class ScheduleController(IScheduleService scheduleService) : ControllerBa
 
   // POST: api/schedule
   [HttpPost]
+  [Authorize(Policy = SecurityPolicies.Administrator)]
   public async Task<ActionResult<ScheduleDto>> CreateSchedule(
     CreateScheduleDto dto, CancellationToken ct)
   {
@@ -50,6 +54,7 @@ public class ScheduleController(IScheduleService scheduleService) : ControllerBa
 
   // PUT: api/schedule/5
   [HttpPut("{id:int}")]
+  [Authorize(Policy = SecurityPolicies.Administrator)]
   public async Task<ActionResult<ScheduleDto>> UpdateSchedule(
     int id, CreateScheduleDto dto, CancellationToken ct)
   {
@@ -70,6 +75,7 @@ public class ScheduleController(IScheduleService scheduleService) : ControllerBa
 
   // DELETE: api/schedule/5
   [HttpDelete("{id:int}")]
+  [Authorize(Policy = SecurityPolicies.Administrator)]
   public async Task<IActionResult> DeleteSchedule(int id, CancellationToken ct)
   {
     try
