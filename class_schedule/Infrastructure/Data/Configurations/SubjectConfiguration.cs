@@ -10,6 +10,7 @@ public class SubjectConfiguration : IEntityTypeConfiguration<Subject>
   {
     // ── Clave primaria ──────────────────────────────────────────────
     builder.HasKey(s => s.Id);
+    builder.ToTable(t => t.HasCheckConstraint("CK_Subject_WeeklyHours", "WeeklyHours > 0"));
 
     // ── Propiedades ─────────────────────────────────────────────────
 

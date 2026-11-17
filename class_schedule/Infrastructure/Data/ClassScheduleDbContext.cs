@@ -12,6 +12,9 @@ public class ClassScheduleDbContext(DbContextOptions<ClassScheduleDbContext> opt
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
     public DbSet<Room> Rooms => Set<Room>();
+    public DbSet<AcademicTerm> AcademicTerms => Set<AcademicTerm>();
+    public DbSet<CourseOffering> CourseOfferings => Set<CourseOffering>();
+    public DbSet<CourseSection> CourseSections => Set<CourseSection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

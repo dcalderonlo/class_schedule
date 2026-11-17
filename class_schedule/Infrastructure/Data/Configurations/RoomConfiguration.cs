@@ -10,6 +10,7 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
   {
     // ── Clave primaria ──────────────────────────────────────────────
     builder.HasKey(r => r.Id);
+    builder.ToTable(t => t.HasCheckConstraint("CK_Room_Capacity", "Capacity > 0"));
 
     // ── Propiedades ─────────────────────────────────────────────────
 

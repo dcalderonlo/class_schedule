@@ -14,6 +14,7 @@ builder.Services.AddDbContext<ClassScheduleDbContext>(options =>
     if (!string.IsNullOrWhiteSpace(connection)) options.UseSqlServer(connection);
 });
 builder.Services.AddScoped<IScheduleService, ScheduleService>();
+builder.Services.AddScoped<IAcademicCatalogService, AcademicCatalogService>();
 builder.Services.AddScheduleIdentity();
 
 var app = builder.Build();
