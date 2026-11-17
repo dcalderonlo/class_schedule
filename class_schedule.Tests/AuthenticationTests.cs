@@ -147,11 +147,16 @@ public class AuthenticationTests
             db.Subjects.Add(new Subject { Id = 1, Name = "Mathematics", Code = "MAT-1", WeeklyHours = 4 });
             db.Teachers.Add(new Teacher { Id = 1, FirstName = "Ada", LastName = "Lovelace", Email = "teacher@example.test" });
             db.Rooms.Add(new Room { Id = 1, Number = "A-101", Capacity = 30 });
+            db.AcademicTerms.Add(new AcademicTerm("Spring", new DateOnly(2026, 1, 1), new DateOnly(2026, 5, 1)));
+            await db.SaveChangesAsync();
+            db.CourseOfferings.Add(new CourseOffering(1, 1));
+            await db.SaveChangesAsync();
+            db.CourseSections.Add(new CourseSection(1, "A", 20));
             await db.SaveChangesAsync();
         }
         Assert.Equal(HttpStatusCode.OK, (await Credentials(client, "login")).StatusCode);
         await Token(client);
-        var create = new { subjectId = 1, teacherId = 1, roomId = 1, dayOfWeek = 1, startTime = "09:00:00", endTime = "10:00:00", gradeLevel = 1 };
+        var create = new { courseSectionId = 1, teacherId = 1, roomId = 1, dayOfWeek = 1, startTime = "09:00:00", endTime = "10:00:00" };
         var created = await client.PostAsJsonAsync("/api/schedule", create);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.NotNull(created.Headers.Location);
@@ -180,7 +185,7 @@ public class AuthenticationTests
         Assert.False(string.IsNullOrWhiteSpace((await conflict.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString()));
         Assert.Equal(before, await client.GetStringAsync("/api/schedule"));
 
-        var update = new { subjectId = 1, teacherId = 1, roomId = 1, dayOfWeek = 2, startTime = "11:00:00", endTime = "12:00:00", gradeLevel = 2 };
+        var update = new { courseSectionId = 1, teacherId = 1, roomId = 1, dayOfWeek = 2, startTime = "11:00:00", endTime = "12:00:00" };
         var updated = await client.PutAsJsonAsync($"/api/schedule/{id}", update);
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         var changed = await updated.Content.ReadFromJsonAsync<JsonElement>();
@@ -188,7 +193,7 @@ public class AuthenticationTests
         Assert.Equal(2, changed.GetProperty("dayOfWeek").GetInt32());
         Assert.Equal("11:00:00", changed.GetProperty("startTime").GetString());
         Assert.Equal("12:00:00", changed.GetProperty("endTime").GetString());
-        Assert.Equal(2, changed.GetProperty("gradeLevel").GetInt32());
+        Assert.Equal(1, changed.GetProperty("courseSectionId").GetInt32());
         Assert.Equal(changed.ToString(), (await (await client.GetAsync($"/api/schedule/{id}")).Content.ReadFromJsonAsync<JsonElement>()).ToString());
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/schedule/999")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync("/api/schedule/999", update)).StatusCode);

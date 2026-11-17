@@ -1,252 +1,139 @@
-// using class_schedule.Application.Interfaces;
-// using class_schedule.Domain.Models.Entities;
-// using class_schedule.Infrastructure.Data;
-// using Microsoft.EntityFrameworkCore;
-
-// namespace class_schedule.Application.Services;
-
-// public class ScheduleService(ClassScheduleDbContext db) : IScheduleService
-// {
-//   // ── GET ALL ────────────────────────────────────────────────────────
-//   public async Task<IEnumerable<Schedule>> GetAllAsync()
-//     => await db.Schedules
-//       .Include(s => s.Subject)
-//       .Include(s => s.Teacher)
-//       .Include(s => s.Room)
-//       .AsNoTracking()
-//       .ToListAsync();
-
-//   // ── GET BY ID ──────────────────────────────────────────────────────
-//   public async Task<Schedule?> GetByIdAsync(int id)
-//     => await db.Schedules
-//       .Include(s => s.Subject)
-//       .Include(s => s.Teacher)
-//       .Include(s => s.Room)
-//       .AsNoTracking()
-//       .FirstOrDefaultAsync(s => s.Id == id);
-
-//   // ── CREATE ─────────────────────────────────────────────────────────
-//   public async Task<Schedule> CreateAsync(Schedule item)
-//   {
-//     await ValidateConflictsAsync(item);
-
-//     db.Schedules.Add(item);
-//     await db.SaveChangesAsync();
-//     return item;
-//   }
-
-//   // ── UPDATE ─────────────────────────────────────────────────────────
-//   public async Task<Schedule> UpdateAsync(int id, Schedule item)
-//   {
-//     ArgumentNullException.ThrowIfNull(item);
-
-//     var existing = await db.Schedules.FindAsync(id)
-//       ?? throw new KeyNotFoundException($"Schedule {id} no encontrado.");
-
-//     // Garantiza que el Id del objeto entrante no sobreescriba la clave primaria
-//     item.Id = id;
-//     db.Entry(existing).CurrentValues.SetValues(item);
-
-//     await ValidateConflictsAsync(existing, excludeId: id);
-//     await db.SaveChangesAsync();
-//     return existing;
-//   }
-
-//   // ── DELETE ─────────────────────────────────────────────────────────
-//   public async Task DeleteAsync(int id)
-//   {
-//     var item = await db.Schedules.FindAsync(id)
-//       ?? throw new KeyNotFoundException($"Schedule {id} no encontrado.");
-
-//     db.Schedules.Remove(item);
-//     await db.SaveChangesAsync();
-//   }
-
-//   // ── VALIDACIÓN DE CONFLICTOS ───────────────────────────────────────
-//   // Centralizada aquí para que tanto Create como Update la reutilicen.
-//   // excludeId permite ignorar el propio registro al validar un Update.
-//   private async Task ValidateConflictsAsync(Schedule item, int? excludeId = null)
-//   {
-//     // Candidatos: mismo día, con solapamiento de horario
-//     var overlapping = await db.Schedules
-//       .Where(s => s.Id != excludeId
-//           && s.DayOfWeek  == item.DayOfWeek
-//           && s.StartTime  <  item.EndTime
-//           && s.EndTime    >  item.StartTime)
-//       .ToListAsync();
-
-//     // Conflicto 1: misma aula, mismo horario
-//     var roomConflict = overlapping.FirstOrDefault(s => s.RoomId == item.RoomId);
-//     if (roomConflict is not null)
-//       throw new InvalidOperationException(
-//         $"El aula ya está ocupada el {item.DayOfWeek} " +
-//         $"de {roomConflict.StartTime} a {roomConflict.EndTime}.");
-
-//     // Conflicto 2: mismo profesor, mismo horario
-//     var teacherConflict = overlapping.FirstOrDefault(s => s.TeacherId == item.TeacherId);
-//     if (teacherConflict is not null)
-//       throw new InvalidOperationException(
-//         $"El profesor ya tiene clase asignada el {item.DayOfWeek} " +
-//         $"de {teacherConflict.StartTime} a {teacherConflict.EndTime}.");
-
-//     // Conflicto 3: mismo grado, mismo horario
-//     var gradeConflict = overlapping.FirstOrDefault(s => s.GradeLevel == item.GradeLevel);
-//     if (gradeConflict is not null)
-//       throw new InvalidOperationException(
-//         $"El grado {item.GradeLevel} ya tiene clase asignada el {item.DayOfWeek} " +
-//         $"de {gradeConflict.StartTime} a {gradeConflict.EndTime}.");
-//   }
-// }
-
-
+using System.Data;
+using System.Data.Common;
 using class_schedule.Application.DTOs;
+using class_schedule.Application.Exceptions;
 using class_schedule.Application.Interfaces;
 using class_schedule.Domain.Models.Entities;
+using class_schedule.Domain.Scheduling;
 using class_schedule.Infrastructure.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace class_schedule.Application.Services;
 
 public class ScheduleService(ClassScheduleDbContext db) : IScheduleService
 {
-  // ── QUERY BASE ────────────────────────────────────────────────────
-  private IQueryable<Schedule> QueryWithIncludes() =>
-    db.Schedules
-      .Include(s => s.Subject)
-      .Include(s => s.Teacher)
-      .Include(s => s.Room);
+    private static SchedulingException Invalid(string message) => new(400, message);
+    private static SchedulingException Missing() => new(404, "Schedule or referenced record not found.");
+    private static SchedulingException Conflict(string message) => new(409, message);
 
-  // ── GET ALL ───────────────────────────────────────────────────────
-  public async Task<IEnumerable<ScheduleDto>> GetAllAsync(CancellationToken ct = default)
-  {
-    var schedules = await QueryWithIncludes()
-      .AsNoTracking()
-      .ToListAsync(ct);
+    private IQueryable<ScheduleDto> Projection(IQueryable<Schedule> schedules) =>
+        from schedule in schedules
+        join section in db.CourseSections on schedule.CourseSectionId equals section.Id
+        join offering in db.CourseOfferings on section.CourseOfferingId equals offering.Id
+        join subject in db.Subjects on offering.SubjectId equals subject.Id
+        join teacher in db.Teachers on schedule.TeacherId equals teacher.Id
+        join room in db.Rooms on schedule.RoomId equals room.Id
+        select new ScheduleDto(schedule.Id, section.Id, section.Code, offering.Id, subject.Id, subject.Name,
+            teacher.Id, teacher.FirstName + " " + teacher.LastName, room.Id, room.Number,
+            schedule.DayOfWeek, schedule.StartTime, schedule.EndTime);
 
-    return schedules.Select(ToDto);
-  }
+    public async Task<IReadOnlyList<ScheduleDto>> GetAllAsync(int offset, int size, CancellationToken ct = default) =>
+        await Projection(db.Schedules.AsNoTracking().OrderBy(x => x.Id).Skip(offset).Take(size)).ToListAsync(ct);
 
-  // ── GET BY ID ─────────────────────────────────────────────────────
-  public async Task<ScheduleDto?> GetByIdAsync(int id, CancellationToken ct = default)
-  {
-    var schedule = await QueryWithIncludes()
-      .AsNoTracking()
-      .FirstOrDefaultAsync(s => s.Id == id, ct);
+    public Task<ScheduleDto?> GetByIdAsync(int id, CancellationToken ct = default) =>
+        Projection(db.Schedules.AsNoTracking().Where(x => x.Id == id)).FirstOrDefaultAsync(ct);
 
-    return schedule is null ? null : ToDto(schedule);
-  }
+    public Task<ScheduleDto> CreateAsync(CreateScheduleDto dto, CancellationToken ct = default) => Save(dto, null, ct);
+    public Task<ScheduleDto> UpdateAsync(int id, CreateScheduleDto dto, CancellationToken ct = default) => Save(dto, id, ct);
 
-  // ── CREATE ────────────────────────────────────────────────────────
-  public async Task<ScheduleDto> CreateAsync(CreateScheduleDto dto, CancellationToken ct = default)
-  {
-    ArgumentNullException.ThrowIfNull(dto);
+    private async Task<ScheduleDto> Save(CreateScheduleDto dto, int? id, CancellationToken ct)
+    {
+        if (dto.CourseSectionId <= 0 || dto.TeacherId <= 0 || dto.RoomId <= 0 || (id.HasValue && id <= 0))
+            throw Invalid("IDs must be positive.");
+        if (!MeetingRules.Valid(dto.DayOfWeek, dto.StartTime, dto.EndTime))
+            throw Invalid("A valid weekday and same-day time interval are required.");
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            Schedule item;
+            if (id.HasValue)
+                item = await db.Schedules.SingleOrDefaultAsync(x => x.Id == id.Value, ct) ?? throw Missing();
+            else
+                item = new Schedule();
 
-    var schedule = ToEntity(dto);
+            var context = await (from section in db.CourseSections
+                join offering in db.CourseOfferings on section.CourseOfferingId equals offering.Id
+                join subject in db.Subjects on offering.SubjectId equals subject.Id
+                join term in db.AcademicTerms on offering.AcademicTermId equals term.Id
+                where section.Id == dto.CourseSectionId
+                select new { section.Capacity, subject.WeeklyHours, term.StartDate, term.EndDate }).SingleOrDefaultAsync(ct)
+                ?? throw Missing();
+            var room = await db.Rooms.SingleOrDefaultAsync(x => x.Id == dto.RoomId, ct) ?? throw Missing();
+            if (!await db.Teachers.AnyAsync(x => x.Id == dto.TeacherId, ct)) throw Missing();
+            if (!MeetingRules.Occurs(context.StartDate, context.EndDate, dto.DayOfWeek))
+                throw Invalid("The weekday does not occur in the term.");
+            if (room.Capacity < context.Capacity) throw Conflict("The room is too small for the section.");
 
-    await ValidateConflictsAsync(schedule, ct);
+            // Read the complete section range for load and section overlap. Serializable range locks
+            // also protect an empty range against simultaneous insertions on SQL Server.
+            var sectionMeetings = await db.Schedules.AsNoTracking().Where(x => x.CourseSectionId == dto.CourseSectionId && x.Id != id)
+                .Select(x => new { x.DayOfWeek, x.StartTime, x.EndTime }).ToListAsync(ct);
+            decimal ticks = dto.EndTime.Ticks - dto.StartTime.Ticks;
+            foreach (var meeting in sectionMeetings)
+            {
+                ticks += meeting.EndTime.Ticks - meeting.StartTime.Ticks;
+                if (meeting.DayOfWeek == dto.DayOfWeek && meeting.StartTime < dto.EndTime && meeting.EndTime > dto.StartTime)
+                    throw Conflict("The section already has a meeting at this time.");
+            }
+            if (ticks > (decimal)context.WeeklyHours * TimeSpan.TicksPerHour)
+                throw Conflict("The section exceeds the subject's weekly hours.");
 
-    db.Schedules.Add(schedule);
-    await db.SaveChangesAsync(ct);
+            // Query each resource separately so serializable locking covers both indexed ranges.
+            foreach (var byRoom in new[] { true, false })
+            {
+                var candidates = byRoom
+                    ? db.Schedules.AsNoTracking().Where(x => x.RoomId == dto.RoomId)
+                    : db.Schedules.AsNoTracking().Where(x => x.TeacherId == dto.TeacherId);
+                var dates = await (from meeting in candidates
+                    join section in db.CourseSections on meeting.CourseSectionId equals section.Id
+                    join offering in db.CourseOfferings on section.CourseOfferingId equals offering.Id
+                    join term in db.AcademicTerms on offering.AcademicTermId equals term.Id
+                    where meeting.Id != id && meeting.DayOfWeek == dto.DayOfWeek && meeting.StartTime < dto.EndTime && meeting.EndTime > dto.StartTime
+                    select new { term.StartDate, term.EndDate }).ToListAsync(ct);
+                if (dates.Any(x => MeetingRules.ShareOccurrence(context.StartDate, context.EndDate, x.StartDate, x.EndDate, dto.DayOfWeek)))
+                    throw Conflict(byRoom ? "The room is occupied." : "The teacher is occupied.");
+            }
 
-    var created = await QueryWithIncludes()
-      .FirstAsync(s => s.Id == schedule.Id, ct);
+            item.CourseSectionId = dto.CourseSectionId;
+            item.TeacherId = dto.TeacherId;
+            item.RoomId = dto.RoomId;
+            item.DayOfWeek = dto.DayOfWeek;
+            item.StartTime = dto.StartTime;
+            item.EndTime = dto.EndTime;
+            if (!id.HasValue) db.Schedules.Add(item);
+            await db.SaveChangesAsync(ct);
+            var result = await GetByIdAsync(item.Id, ct) ?? throw Missing();
+            await transaction.CommitAsync(ct);
+            return result;
+        }
+        catch (DbUpdateConcurrencyException) { throw Conflict("The schedule changed concurrently; retry the request."); }
+        catch (Exception ex) when (IsLockConflict(ex)) { throw Conflict("The schedule changed concurrently; retry the request."); }
+        catch (Exception ex) when (IsForeignKeyConflict(ex)) { throw Missing(); }
+    }
 
-    return ToDto(created);
-  }
+    private static bool IsLockConflict(Exception error)
+    {
+        for (Exception? ex = error; ex != null; ex = ex.InnerException)
+        {
+            if (ex is SqlException sql && (sql.Number == 1205 || sql.Number == 1222)) return true;
+            // SQLite is a test provider; avoid adding it as a production dependency.
+            if (ex is DbException && ex.GetType().FullName == "Microsoft.Data.Sqlite.SqliteException" &&
+                ex.GetType().GetProperty("SqliteErrorCode")?.GetValue(ex) is int code && (code == 5 || code == 6)) return true;
+        }
+        return false;
+    }
+    private static bool IsForeignKeyConflict(Exception error)
+    {
+        for (Exception? ex = error; ex != null; ex = ex.InnerException)
+            if (ex is SqlException sql && sql.Number == 547) return true;
+        return false;
+    }
 
-  // ── UPDATE ────────────────────────────────────────────────────────
-  public async Task<ScheduleDto> UpdateAsync(int id, CreateScheduleDto dto, CancellationToken ct = default)
-  {
-    ArgumentNullException.ThrowIfNull(dto);
-
-    var existing = await db.Schedules.FindAsync([id], ct)
-      ?? throw new KeyNotFoundException($"Schedule {id} no encontrado.");
-
-    // Asigna el Id antes de SetValues para proteger la clave primaria
-    var entity = ToEntity(dto);
-    entity.Id  = id;
-    db.Entry(existing).CurrentValues.SetValues(entity);
-
-    await ValidateConflictsAsync(existing, ct, excludeId: id);
-    await db.SaveChangesAsync(ct);
-
-    var updated = await QueryWithIncludes()
-      .FirstAsync(s => s.Id == id, ct);
-
-    return ToDto(updated);
-  }
-
-  // ── DELETE ────────────────────────────────────────────────────────
-  public async Task DeleteAsync(int id, CancellationToken ct = default)
-  {
-    var schedule = await db.Schedules.FindAsync([id], ct)
-      ?? throw new KeyNotFoundException($"Schedule {id} no encontrado.");
-
-    db.Schedules.Remove(schedule);
-    await db.SaveChangesAsync(ct);
-  }
-
-  // ── VALIDACIÓN DE CONFLICTOS ──────────────────────────────────────
-  private async Task ValidateConflictsAsync(
-    Schedule schedule, CancellationToken ct, int? excludeId = null)
-  {
-    bool roomConflict = await db.Schedules.AnyAsync(s =>
-      s.Id        != excludeId      &&
-      s.DayOfWeek == schedule.DayOfWeek &&
-      s.StartTime <  schedule.EndTime &&
-      s.EndTime   >  schedule.StartTime &&
-      s.RoomId    == schedule.RoomId, ct);
-
-    if (roomConflict)
-      throw new InvalidOperationException(
-        $"El aula ya está ocupada el {schedule.DayOfWeek} " +
-        $"de {schedule.StartTime} a {schedule.EndTime}.");
-
-    bool teacherConflict = await db.Schedules.AnyAsync(s =>
-      s.Id        != excludeId      &&
-      s.DayOfWeek == schedule.DayOfWeek &&
-      s.StartTime <  schedule.EndTime &&
-      s.EndTime   >  schedule.StartTime &&
-      s.TeacherId == schedule.TeacherId, ct);
-
-    if (teacherConflict)
-      throw new InvalidOperationException(
-        $"El profesor ya tiene clase asignada el {schedule.DayOfWeek} " +
-        $"de {schedule.StartTime} a {schedule.EndTime}.");
-
-    bool gradeConflict = await db.Schedules.AnyAsync(s =>
-      s.Id        != excludeId         &&
-      s.DayOfWeek == schedule.DayOfWeek &&
-      s.StartTime <  schedule.EndTime  &&
-      s.EndTime   >  schedule.StartTime &&
-      s.GradeLevel == schedule.GradeLevel, ct);
-
-    if (gradeConflict)
-      throw new InvalidOperationException(
-        $"El grado {schedule.GradeLevel} ya tiene clase asignada el {schedule.DayOfWeek} " +
-        $"de {schedule.StartTime} a {schedule.EndTime}.");
-  }
-
-    // ── MAPEOS ────────────────────────────────────────────────────────
-  private static ScheduleDto ToDto(Schedule s) => new(
-    s.Id,
-    s.Subject.Name,
-    s.Teacher.FullName,
-    s.Room.Number,
-    s.DayOfWeek,
-    s.StartTime,
-    s.EndTime,
-    s.GradeLevel
-  );
-
-  private static Schedule ToEntity(CreateScheduleDto dto) => new()
-  {
-    SubjectId  = dto.SubjectId,
-    TeacherId  = dto.TeacherId,
-    RoomId     = dto.RoomId,
-    DayOfWeek  = dto.DayOfWeek,   // ← corregido
-    StartTime  = dto.StartTime,
-    EndTime    = dto.EndTime,
-    GradeLevel = dto.GradeLevel
-  };
+    public async Task DeleteAsync(int id, CancellationToken ct = default)
+    {
+        var item = await db.Schedules.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Missing();
+        db.Schedules.Remove(item);
+        await db.SaveChangesAsync(ct);
+    }
 }
