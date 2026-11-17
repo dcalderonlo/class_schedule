@@ -28,4 +28,4 @@ Nothing in application startup applies migrations. The migration's `Down` drops 
 
 ## Boundaries
 
-The migration and its offline-generated SQL represent the current Identity, catalog, scheduling, enrollment and notification model. Offline metadata and SQL generation do not prove SQL Server execution, concurrency behavior, or a successful migration on a real server. Secure initial administrator provisioning is a separate dependent work unit; this schema does not create an administrator or seed credentials.
+The migration and its offline-generated SQL represent the current Identity, catalog, scheduling, enrollment and notification model. Offline metadata and SQL generation do not prove SQL Server execution, concurrency behavior, or a successful migration on a real server. This schema does not create an administrator or seed credentials. After the reviewed schema is applied, see the default-disabled [development initial administrator procedure](initial-admin.md); production provisioning remains separate.

@@ -21,6 +21,7 @@ builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IScheduleService, ScheduleService>();
 builder.Services.AddScoped<IAcademicCatalogService, AcademicCatalogService>();
 builder.Services.AddScheduleIdentity();
+builder.Services.AddHostedService<DevelopmentAdminInitializer>();
 
 var app = builder.Build();
 if (!app.Environment.IsDevelopment())
