@@ -95,6 +95,53 @@ public class EnrollmentTests
     }
 
     [Fact]
+    public async Task Cross_offering_transfer_does_not_conflict_with_itself()
+    {
+        await using var app = new EnrollmentApplicationFactory();
+        using var admin = Client(app); using var student = Client(app);
+        await Login(app, admin, "admin@example.test", true);
+        await Login(app, student, "student@example.test");
+        var sections = await Seed(admin);
+        var other = await OtherClass(admin, "10:00:00", "11:00:00");
+        foreach (var section in new[] { sections.first, other.section })
+            Assert.Equal(HttpStatusCode.Created,
+                (await student.PostAsJsonAsync("/api/enrollments",
+                    new { courseSectionId = section })).StatusCode);
+
+        var meetings = await (await admin.GetAsync("/api/schedule"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var moving = meetings.EnumerateArray().Single(x =>
+            x.GetProperty("courseSectionId").GetInt32() == sections.first);
+        var id = moving.GetProperty("id").GetInt32();
+        var before = await Snapshot(student);
+        var response = await admin.PutAsJsonAsync($"/api/schedule/{id}", new {
+            courseSectionId = other.section,
+            teacherId = moving.GetProperty("teacherId").GetInt32(),
+            roomId = moving.GetProperty("roomId").GetInt32(),
+            dayOfWeek = 1, startTime = "09:00:00", endTime = "10:00:00"
+        });
+        var body = await response.Content.ReadAsStringAsync();
+        if (response.StatusCode != HttpStatusCode.OK)
+            Assert.Equal(before, await Snapshot(student));
+        Assert.True(response.StatusCode == HttpStatusCode.OK,
+            $"Expected 200; actual {(int)response.StatusCode}: {body}");
+        Assert.Equal(before.enrollments,
+            await student.GetStringAsync("/api/enrollments"));
+        var timetable = await (await student.GetAsync("/api/enrollments/timetable"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(2, timetable.GetArrayLength());
+        Assert.All(timetable.EnumerateArray(), x =>
+            Assert.Equal(other.section, x.GetProperty("courseSectionId").GetInt32()));
+        Assert.Single(timetable.EnumerateArray(),
+            x => x.GetProperty("id").GetInt32() == id);
+        var notices = await (await student.GetAsync("/api/notifications"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Single(notices.EnumerateArray());
+        Assert.Equal("A meeting in your schedule has changed.",
+            notices[0].GetProperty("message").GetString());
+    }
+
+    [Fact]
     public async Task Shared_date_range_without_shared_weekday_and_inclusive_boundary()
     {
         await using var app = new EnrollmentApplicationFactory(); using var admin = Client(app); using var student = Client(app);

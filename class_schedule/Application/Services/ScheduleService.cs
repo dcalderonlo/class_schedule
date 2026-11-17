@@ -104,7 +104,7 @@ public class ScheduleService(ClassScheduleDbContext db) : IScheduleService
                     join term in db.AcademicTerms on offering.AcademicTermId equals term.Id
                     where enrolledUsers.Contains(enrollment.UserId) && enrollment.CourseOfferingId !=
                         db.CourseSections.Where(s => s.Id == dto.CourseSectionId).Select(s => s.CourseOfferingId).First()
-                        && meeting.DayOfWeek == dto.DayOfWeek && meeting.StartTime < dto.EndTime && meeting.EndTime > dto.StartTime
+                        && meeting.Id != id && meeting.DayOfWeek == dto.DayOfWeek && meeting.StartTime < dto.EndTime && meeting.EndTime > dto.StartTime
                     select new { term.StartDate, term.EndDate }).ToListAsync(ct);
                 if (otherMeetings.Any(x => MeetingRules.ShareOccurrence(context.StartDate, context.EndDate, x.StartDate, x.EndDate, dto.DayOfWeek)))
                     throw Conflict("The meeting conflicts with an enrolled user's schedule.");
