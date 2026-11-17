@@ -9,6 +9,7 @@ public class CourseSectionConfiguration : IEntityTypeConfiguration<CourseSection
     public void Configure(EntityTypeBuilder<CourseSection> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.HasAlternateKey(x => new { x.Id, x.CourseOfferingId });
         builder.Property(x => x.Code).HasMaxLength(20).IsRequired();
         builder.HasOne<CourseOffering>().WithMany().HasForeignKey(x => x.CourseOfferingId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.CourseOfferingId, x.Code }).IsUnique();

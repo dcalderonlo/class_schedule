@@ -23,4 +23,4 @@ If a project-local SDK is installed under `.tools/dotnet`, replace `dotnet` with
 - No overnight meetings. Room capacity and subject weekly-hour limits must be enforced.
 - Database configuration and migrations are not applied automatically; never migrate an existing database without a backup and explicit approval.
 
-See [authentication setup and API usage](docs/authentication.md) and the [academic and meeting API](docs/academic-api.md). Enrollment and notifications remain future work. The meeting contract replaces the former subject/grade fields with a section reference; an existing database requires an explicitly approved migration and data conversion. No secrets or default administrator credentials belong in source control.
+See [authentication setup and API usage](docs/authentication.md), the [academic and meeting API](docs/academic-api.md), and the [enrollment and notification API](docs/enrollment-api.md). The meeting contract replaces the former subject/grade fields with a section reference; an existing database requires an explicitly approved migration and data conversion. No secrets or default administrator credentials belong in source control.

@@ -1,12 +1,10 @@
 using System.Data;
-using System.Data.Common;
 using class_schedule.Application.DTOs;
 using class_schedule.Application.Exceptions;
 using class_schedule.Application.Interfaces;
 using class_schedule.Domain.Models.Entities;
 using class_schedule.Domain.Scheduling;
 using class_schedule.Infrastructure.Data;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace class_schedule.Application.Services;
@@ -95,6 +93,25 @@ public class ScheduleService(ClassScheduleDbContext db) : IScheduleService
                     throw Conflict(byRoom ? "The room is occupied." : "The teacher is occupied.");
             }
 
+            // A new target meeting must not overlap another offering of any enrolled user.
+            var enrolledUsers = await db.Enrollments.AsNoTracking().Where(x => x.CourseSectionId == dto.CourseSectionId)
+                .Select(x => x.UserId).Distinct().ToListAsync(ct);
+            if (enrolledUsers.Count > 0)
+            {
+                var otherMeetings = await (from enrollment in db.Enrollments.AsNoTracking()
+                    join meeting in db.Schedules on enrollment.CourseSectionId equals meeting.CourseSectionId
+                    join offering in db.CourseOfferings on enrollment.CourseOfferingId equals offering.Id
+                    join term in db.AcademicTerms on offering.AcademicTermId equals term.Id
+                    where enrolledUsers.Contains(enrollment.UserId) && enrollment.CourseOfferingId !=
+                        db.CourseSections.Where(s => s.Id == dto.CourseSectionId).Select(s => s.CourseOfferingId).First()
+                        && meeting.DayOfWeek == dto.DayOfWeek && meeting.StartTime < dto.EndTime && meeting.EndTime > dto.StartTime
+                    select new { term.StartDate, term.EndDate }).ToListAsync(ct);
+                if (otherMeetings.Any(x => MeetingRules.ShareOccurrence(context.StartDate, context.EndDate, x.StartDate, x.EndDate, dto.DayOfWeek)))
+                    throw Conflict("The meeting conflicts with an enrolled user's schedule.");
+            }
+            bool changed = !id.HasValue || item.CourseSectionId != dto.CourseSectionId || item.TeacherId != dto.TeacherId ||
+                item.RoomId != dto.RoomId || item.DayOfWeek != dto.DayOfWeek || item.StartTime != dto.StartTime || item.EndTime != dto.EndTime;
+            int oldSection = item.CourseSectionId;
             item.CourseSectionId = dto.CourseSectionId;
             item.TeacherId = dto.TeacherId;
             item.RoomId = dto.RoomId;
@@ -102,38 +119,44 @@ public class ScheduleService(ClassScheduleDbContext db) : IScheduleService
             item.StartTime = dto.StartTime;
             item.EndTime = dto.EndTime;
             if (!id.HasValue) db.Schedules.Add(item);
+            if (changed)
+            {
+                var affected = await db.Enrollments.AsNoTracking()
+                    .Where(x => x.CourseSectionId == oldSection || x.CourseSectionId == dto.CourseSectionId)
+                    .Select(x => x.UserId).Distinct().ToListAsync(ct);
+                db.UserNotifications.AddRange(affected.Select(userId => new UserNotification
+                {
+                    UserId = userId, Message = "A meeting in your schedule has changed.", CreatedAtUtc = DateTime.UtcNow
+                }));
+            }
             await db.SaveChangesAsync(ct);
             var result = await GetByIdAsync(item.Id, ct) ?? throw Missing();
             await transaction.CommitAsync(ct);
             return result;
         }
         catch (DbUpdateConcurrencyException) { throw Conflict("The schedule changed concurrently; retry the request."); }
-        catch (Exception ex) when (IsLockConflict(ex)) { throw Conflict("The schedule changed concurrently; retry the request."); }
-        catch (Exception ex) when (IsForeignKeyConflict(ex)) { throw Missing(); }
-    }
-
-    private static bool IsLockConflict(Exception error)
-    {
-        for (Exception? ex = error; ex != null; ex = ex.InnerException)
-        {
-            if (ex is SqlException sql && (sql.Number == 1205 || sql.Number == 1222)) return true;
-            // SQLite is a test provider; avoid adding it as a production dependency.
-            if (ex is DbException && ex.GetType().FullName == "Microsoft.Data.Sqlite.SqliteException" &&
-                ex.GetType().GetProperty("SqliteErrorCode")?.GetValue(ex) is int code && (code == 5 || code == 6)) return true;
-        }
-        return false;
-    }
-    private static bool IsForeignKeyConflict(Exception error)
-    {
-        for (Exception? ex = error; ex != null; ex = ex.InnerException)
-            if (ex is SqlException sql && sql.Number == 547) return true;
-        return false;
+        catch (Exception ex) when (DatabaseFailureClassifier.IsLockConflict(ex)) { throw Conflict("The schedule changed concurrently; retry the request."); }
+        catch (Exception ex) when (DatabaseFailureClassifier.IsForeignKeyConflict(ex)) { throw Missing(); }
     }
 
     public async Task DeleteAsync(int id, CancellationToken ct = default)
     {
-        var item = await db.Schedules.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Missing();
-        db.Schedules.Remove(item);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var item = await db.Schedules.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw Missing();
+            var affected = await db.Enrollments.AsNoTracking().Where(x => x.CourseSectionId == item.CourseSectionId)
+                .Select(x => x.UserId).Distinct().ToListAsync(ct);
+            db.Schedules.Remove(item);
+            db.UserNotifications.AddRange(affected.Select(userId => new UserNotification
+            {
+                UserId = userId, Message = "A meeting in your schedule has changed.", CreatedAtUtc = DateTime.UtcNow
+            }));
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException) { throw Conflict("The schedule changed concurrently; retry the request."); }
+        catch (Exception ex) when (DatabaseFailureClassifier.IsLockConflict(ex)) { throw Conflict("The schedule changed concurrently; retry the request."); }
+        catch (Exception ex) when (DatabaseFailureClassifier.IsForeignKeyConflict(ex)) { throw Missing(); }
     }
 }

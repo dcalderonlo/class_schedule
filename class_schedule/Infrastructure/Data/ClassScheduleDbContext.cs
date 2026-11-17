@@ -15,6 +15,8 @@ public class ClassScheduleDbContext(DbContextOptions<ClassScheduleDbContext> opt
     public DbSet<AcademicTerm> AcademicTerms => Set<AcademicTerm>();
     public DbSet<CourseOffering> CourseOfferings => Set<CourseOffering>();
     public DbSet<CourseSection> CourseSections => Set<CourseSection>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
+    public DbSet<Enrollment> Enrollments => Set<Enrollment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
