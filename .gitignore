@@ -1,0 +1,19 @@
+# .NET generated and local IDE files
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+TestResults/
+
+# Local tools, credentials and databases
+.tools/
+.packages/
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+*.db
+*.db-shm
+*.db-wal
