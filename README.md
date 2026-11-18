@@ -14,7 +14,7 @@ env -u CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED -u CLASS_SCHEDULE_SQLSERVER_TEST_CO
 
 If a project-local SDK is installed under `.tools/dotnet`, replace `dotnet` with `.tools/dotnet/dotnet`. Generated build output and local tools are ignored, not deleted.
 
-SQL Server provider verification is explicitly opt-in and remains unrun; see [its safety and authorization requirements](docs/sqlserver-verification.md). For a default suite that cannot inherit an opt-in, unset both `CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED` and `CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION` as shown there.
+SQL Server provider verification is explicitly opt-in and passed against the authorized local SQL Server 2022 container on November 18, 2026; see [the evidence and safety requirements](docs/sqlserver-verification.md). This does not certify production readiness. For a default suite that cannot inherit an opt-in, unset both `CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED` and `CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION` as shown there.
 
 ## Implementation boundaries
 

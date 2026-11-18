@@ -1,6 +1,14 @@
 # SQL Server provider verification
 
-The provider test is **not yet run** and is not production certification. Default tests skip it. Running it requires separate human authorization and a dedicated, disposable SQL Server 2022 or compatible instance; never use production or a shared server. The instance must permit CREATE DATABASE, ALTER DATABASE and DROP DATABASE. This document does not authorize an agent to connect or run it.
+The provider test **passed on November 18, 2026** against the explicitly authorized local SQL Server 2022 Docker container. This is not production certification. Default tests still skip it. Future runs require separate human authorization and a dedicated, disposable SQL Server 2022 or compatible instance; never use production or a shared server. The instance must permit CREATE DATABASE, ALTER DATABASE and DROP DATABASE. This document does not authorize an agent to connect or run it.
+
+## Observed verification
+
+- The existing `Real_provider_migration_bootstrap_and_enrollment_workflow` test executed: 1 passed, 0 failed, 0 skipped; exit code 0. It covers the real migration, development administrator bootstrap, concurrent capacity and personal-conflict enforcement, enrollment privacy, notifications and rollback after an injected notification failure.
+- The container had no published host port. A temporary loopback-only tunnel at `127.0.0.1:14330` provided access without restarting or recreating it. The tunnel was closed afterward; no listener remained.
+- Post-run inspection found no `class_schedule_verify_` databases. The six original database IDs, including `tempdb`, remained online. No migration was applied to an existing database.
+- Before testing, five database backups excluding `tempdb` passed `RESTORE VERIFYONLY WITH CHECKSUM`; host copies matched their container SHA-256 hashes. This was backup verification, not an actual restore rehearsal.
+- The ordinary suite separately passed 54 tests with the one opt-in provider test skipped. These results do not establish production readiness or provide persistent host connectivity.
 
 ## Before an authorized run
 
