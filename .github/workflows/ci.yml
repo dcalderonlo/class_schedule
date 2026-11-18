@@ -1,0 +1,64 @@
+name: CI
+
+"on":
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "true"
+  CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED: "0"
+  CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION: ""
+
+jobs:
+  validate:
+    name: Build, analyze and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET from global.json
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore and audit dependencies
+        run: >-
+          dotnet restore ClassSchedule.sln
+          -p:NuGetAudit=true -p:NuGetAuditMode=all -warnaserror
+
+      - name: Compile and run static analyzers
+        run: >-
+          dotnet build ClassSchedule.sln --configuration Release --no-restore
+          -warnaserror -p:RunAnalyzersDuringBuild=true
+
+      - name: Run tests without external SQL Server
+        id: tests
+        run: >-
+          env -u CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED
+          -u CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION
+          dotnet test ClassSchedule.sln --configuration Release
+          --no-build --no-restore --logger "trx;LogFileName=tests.trx"
+          --results-directory "${RUNNER_TEMP}/class-schedule-test-results"
+
+      - name: Upload test results
+        if: ${{ always() && steps.tests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: ${{ runner.temp }}/class-schedule-test-results/*.trx
+          if-no-files-found: warn
+          retention-days: 7

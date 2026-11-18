@@ -14,6 +14,8 @@ env -u CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED -u CLASS_SCHEDULE_SQLSERVER_TEST_CO
 
 Use `dotnet` from an installation containing SDK 11. The previously installed ignored `.tools/dotnet` SDK 10 is not used by this configuration; ignored tools and caches are not deleted automatically. Generated build output remains ignored.
 
+GitHub Actions [continuous integration](docs/ci.md) restores and audits dependencies, compiles with static analyzers and runs the ordinary tests. No deployment is configured.
+
 SQL Server provider verification is explicitly opt-in and passed against the authorized local SQL Server 2022 container on November 18, 2026; see [the evidence and safety requirements](docs/sqlserver-verification.md). This does not certify production readiness. For a default suite that cannot inherit an opt-in, unset both `CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED` and `CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION` as shown there.
 
 ## Implementation boundaries
