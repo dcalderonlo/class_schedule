@@ -1,10 +1,10 @@
 # Class Schedule
 
-A university scheduling and enrollment portfolio application built with ASP.NET Core 10, Blazor and EF Core SQL Server. The university model and secure self-service enrollment are being implemented in reviewable units; see [the feature specification](odd/tasks/secure-university-enrollment.md) for current status.
+A university scheduling and enrollment portfolio application built with ASP.NET Core 11, Blazor and EF Core SQL Server. See [the university feature specification](odd/tasks/secure-university-enrollment.md) for feature status and [the .NET 11 migration guide](docs/net11-migration.md) for platform changes, design choices and verification boundaries.
 
 ## Build and test
 
-Requires the .NET 10 SDK and ASP.NET Core runtime. Do not retarget the application merely because a newer SDK is installed.
+Requires the .NET 11 SDK and ASP.NET Core 11 runtime. `global.json` selects SDK 11.0.100 or a later stable feature band in the same major/minor version.
 
 ```sh
 dotnet restore ClassSchedule.sln
@@ -12,7 +12,7 @@ dotnet build ClassSchedule.sln --no-restore
 env -u CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED -u CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION dotnet test ClassSchedule.sln --no-build
 ```
 
-If a project-local SDK is installed under `.tools/dotnet`, replace `dotnet` with `.tools/dotnet/dotnet`. Generated build output and local tools are ignored, not deleted.
+Use `dotnet` from an installation containing SDK 11. The previously installed ignored `.tools/dotnet` SDK 10 is not used by this configuration; ignored tools and caches are not deleted automatically. Generated build output remains ignored.
 
 SQL Server provider verification is explicitly opt-in and passed against the authorized local SQL Server 2022 container on November 18, 2026; see [the evidence and safety requirements](docs/sqlserver-verification.md). This does not certify production readiness. For a default suite that cannot inherit an opt-in, unset both `CLASS_SCHEDULE_SQLSERVER_TEST_ENABLED` and `CLASS_SCHEDULE_SQLSERVER_TEST_CONNECTION` as shown there.
 
