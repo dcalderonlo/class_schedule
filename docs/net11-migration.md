@@ -34,6 +34,8 @@ The separate .NET 11 SQL Server run passed one test with zero failures or skips.
 
 Independent isolated verification passed SDK selection, both target frameworks, C# 15, an offline build and a runtime/assembly-version probe, with no blockers. That probe is now retained as `PlatformVersionTests`; the final default suite passes 55 tests with the opt-in SQL test skipped. The separately passing real-provider test is not counted as skipped integration proof.
 
+The platform work unit is committed locally as `4b9a34d`. Its consented risk, readability and reliability review completed without findings and was acknowledged. Publishing and production deployment remain separate decisions.
+
 Active SDK, target-framework, framework-package and operator requirements move to 11. Historical task logs and migration metadata are retained. `MinimumVisualStudioVersion = 10.0.40219.1` in the solution describes the solution format's Visual Studio compatibility, not a .NET 10 runtime dependency.
 
 Ignored SDK installations, package caches, build output and database backups are not removed by the migration. No global SDK uninstall, container recreation, existing-database migration or publishing is implied.
