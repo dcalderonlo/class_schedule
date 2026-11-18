@@ -4,7 +4,7 @@ The initial EF migration is for a **new, empty database only**. It does not conv
 
 ## Quick path
 
-From the repository root with the .NET 10 SDK, restore, build and test as described in the [README](../README.md). Then, with network access to the configured NuGet sources, an operator can restore the pinned local EF tool:
+From the repository root with the .NET 11 SDK, restore, build and test as described in the [README](../README.md). Then, with network access to the configured NuGet sources, an operator can restore the pinned EF Core 11 tool:
 
 ```sh
 dotnet tool restore
